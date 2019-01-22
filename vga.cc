@@ -120,6 +120,12 @@ namespace
     } } xterm256init;
     #undef Make16
 
+    // CobaltXII: These two variables retain the
+    // scaling factor for high-dpi monitors.
+
+    int xr_factor;
+    int yr_factor;
+
     SDL_Window*   window   = nullptr;
     SDL_Renderer* renderer = nullptr;
     SDL_Texture*  texture  = nullptr;
@@ -154,7 +160,14 @@ namespace
             window = SDL_CreateWindow("editor",
                 SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                 pixels_width, pixels_height,
-                SDL_WINDOW_RESIZABLE);
+                SDL_WINDOW_RESIZABLE|
+
+                // HIGH DPI SUPPORT!
+                SDL_WINDOW_ALLOW_HIGHDPI);
+
+            // This is not really required but it may be of use for
+            // people with strange monitors. It prevents antialiasing.
+            SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY,0);
         }
         else
         {
@@ -177,6 +190,18 @@ namespace
                 texturewidth  = bufpixels_width,
                 textureheight = bufpixels_height);
         }
+
+        // Get size of OpenGL drawable. This will be larger than the pixels_width and
+        // pixels_height defined by Bisqwit (on high dpi monitors, only!). 
+        int gl_xr;
+        int gl_yr;
+        SDL_GL_GetDrawableSize(window,&gl_xr, &gl_yr);
+
+        // Find the Scaling factors. This is done by dividing the GL resolution by the
+        // resolution defined by Bisqwit. If no high-dpi, this will be 1. Otherwise it
+        // will probably be 2 or rarely 3.
+        xr_factor = gl_xr / pixels_width;
+        yr_factor = gl_yr / pixels_height;
 
         pixbuf.resize(bufpixels_width*bufpixels_height);
         cursor_old=~0u;
@@ -206,6 +231,9 @@ namespace
                 trect.y = rect.y * h / bufpixels_height;
                 trect.w = (rect.x + rect.w) * w / bufpixels_width - trect.x;
                 trect.h = (rect.y + rect.h) * h / bufpixels_height - trect.y;
+
+                trect.w *= xr_factor;
+                trect.h *= yr_factor;
 
                 if(SDL_UpdateTexture(texture, &rect,
                                      pixbuf.data() + rect.y*bufpixels_width,
